@@ -91,36 +91,6 @@ data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288
 data: [DONE]
 ```
 
-## 利用可能なモデル一覧の取得
-
-利用可能なモデル一覧を取得するには、以下のエンドポイントを使用します:
-
-```
-GET /v1/models
-```
-
-レスポンス例:
-
-```json
-{
-  "object": "list",
-  "data": [
-    {
-      "id": "openai/gpt-oss-20b",
-      "object": "model",
-      "created": 1677652288,
-      "owned_by": "llm-proxy"
-    },
-    {
-      "id": "llm-jp/llm-jp-3.1-13b-instruct4",
-      "object": "model",
-      "created": 1677652288,
-      "owned_by": "llm-proxy"
-    }
-  ]
-}
-```
-
 ## 使用例
 
 ### 必要なライブラリのインストール
