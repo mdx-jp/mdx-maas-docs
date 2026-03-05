@@ -47,6 +47,9 @@ APIキーは管理者から提供されます。APIキーが無効または期�
 
 OpenAI互換のその他のパラメータ（`top_p`, `frequency_penalty`, `presence_penalty`など）もサポートされています。
 
+- **reasoning** (object, ストリーミング時のみ): 推論（reasoning）出力の制御
+    - `{"exclude": true}` を指定すると、ストリーミング出力から reasoning を除外し、通常の応答テキストのみを返します。Python SDK では `extra_body={"reasoning": {"exclude": True}}` で指定します。
+
 ## レスポンス形式
 
 ### 非ストリーミングレスポンス
@@ -224,7 +227,7 @@ for chunk in completion:
 
 **注意**: ストリーミングレスポンスでは、各チャンクが順次到着するため、リアルタイムでテキストが表示されます。
 
-### 4. より高度な使用例（会話履歴を含む）
+### 4. 会話履歴を含むより高度な使用例
 
 ```python
 from openai import OpenAI
@@ -259,6 +262,37 @@ completion = client.chat.completions.create(
 )
 
 print(completion.choices[0].message.content)
+```
+
+### 5. ストリーミングで reasoning を出力しない（Python）
+
+ストリーミング出力時、`extra_body` に `reasoning: { "exclude": True }` を指定すると、思考過程（reasoning）を出力せず、応答テキストのみをストリームできます。**このオプションはストリーミング出力時のみ有効です。**
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://api.maas.mdx1.jp/v1",
+    api_key="your-api-key-here",
+)
+
+completion = client.chat.completions.create(
+    model="openai/gpt-oss-20b",
+    temperature=0,
+    messages=[
+        {"role": "user", "content": "フーリエ変換について教えてください"}
+    ],
+    stream=True,
+    extra_body={
+        "reasoning": { "exclude": True }
+    }
+)
+
+for chunk in completion:
+    if chunk.choices and len(chunk.choices) > 0 and chunk.choices[0].delta:
+        content = chunk.choices[0].delta.content
+        if content:
+            print(content, flush=True, end="")
 ```
 
 ## エラーハンドリング
