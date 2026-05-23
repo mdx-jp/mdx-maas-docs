@@ -262,7 +262,7 @@ POST /v1/batches/{batch_id}/cancel
 
 ## 処理中トークン上限（batch_pending_token_limit）
 
-API キーごとに「処理中・処理待ちの入力トークン数の合計」の上限を設けている場合がある。この上限は**時間あたりのトークン制限（hourly_token_limit）とは別**の設定である。
+API キーごとに「処理中・処理待ちの入力トークン数の合計」の上限を設けている場合がある。この上限は**バッチ用ウィンドウ上限（後述）や Chat 用ウィンドウ上限とは別**の設定である。
 
 ### 仕様
 
@@ -281,6 +281,49 @@ API キーごとに「処理中・処理待ちの入力トークン数の合計�
 
 ---
 
+## バッチ用ウィンドウ上限（短期 / 長期）
+
+「処理中トークン上限」とは別に、API キーごとに**直近一定期間のバッチ推論で消費したトークン合計**に対する上限が設定されている場合がある。これは Chat Completions API 側の同種の上限とは独立に管理される。
+
+### 仕様
+
+- **対象**: バッチ推論ワーカーがリクエストごとに記録する `total_tokens`（input + output）の合計。
+- **集計期間**: 以下の 2 つのスライディングウィンドウを同時に判定する。
+  - **短期ウィンドウ**: 直近 N 時間（既定 3 時間）
+  - **長期ウィンドウ**: 直近 N 日（既定 7 日）
+- **チェックタイミング**: バッチ作成（`POST /v1/batches`）時に、認証 API キーの「これまでのバッチ推論使用量」が短期 / 長期それぞれの上限を超えていないか判定する。どちらか一方でも上限以上に達していれば、その時点で **429 Too Many Requests** が返り、バッチは作成されない。
+- **対象のリクエスト**: バッチ推論ワーカーが完了させたリクエストの `total_tokens` のみが集計される。Chat Completions API の使用量は含まれない。
+- **判定の性質**: 既存使用量で判定するリアクティブ方式（新規バッチのトークン数は加算しない）。Chat 側のウィンドウ上限と同じ挙動である。
+- **上限の設定**: 管理者が API キーごとに `batch_short_window_token_limit` / `batch_long_window_token_limit` を設定する。未設定（NULL）の場合は無制限である。ウィンドウ幅も管理者の設定に依存する。
+
+### 429 が返った場合
+
+レスポンスの `detail` に、どちらのウィンドウを超過したかと現在の使用量・上限値が含まれる。
+
+- **短期ウィンドウ超過**:
+
+    ```json
+    {
+      "detail": "Batch short-window (3h) token limit exceeded. Current: 250000, Limit: 200000"
+    }
+    ```
+
+- **長期ウィンドウ超過**:
+
+    ```json
+    {
+      "detail": "Batch long-window (7d) token limit exceeded. Current: 2500000, Limit: 2000000"
+    }
+    ```
+
+対処例:
+
+- 短期ウィンドウ超過の場合、時間が経つほど古い使用量がウィンドウから外れるため、数時間待ってから再投入する
+- バッチ投入前に `GET /v1/usage` で `batch.short_window` / `batch.long_window` の `remaining_tokens` を確認し、余裕があるタイミングで投入する。詳細は [usage_api_document.md](usage_api_document.md) を参照
+- 上限の引き上げが必要な場合は管理者に依頼する
+
+---
+
 ## 制限事項・注意事項
 
 - **endpoint**: `/v1/chat/completions` のみ対応
@@ -290,6 +333,7 @@ API キーごとに「処理中・処理待ちの入力トークン数の合計�
 - **バッチ用モデル**: 通常の Chat Completions 用モデルとは別の ConfigMap で管理されている可能性がある。利用可能なモデルは管理者に確認すること
 - **ファイル・バッチのスコープ**: 自分がアップロードしたファイル／作成したバッチのみ取得可能。別の API キーで作成したリソースは 404 になる
 - **処理中トークン上限**: API キーごとに「処理中・処理待ち」の入力トークン合計の上限が設定されている場合がある。超過時はバッチ作成時に 429 が返る（上記「処理中トークン上限」を参照）
+- **バッチ用ウィンドウ上限**: API キーごとに「直近 N 時間 / N 日のバッチ推論使用トークン合計」の上限が設定されている場合がある。超過時はバッチ作成時に 429 が返る（上記「バッチ用ウィンドウ上限」を参照）。`GET /v1/usage` で現在の使用量を確認できる
 
 ---
 
@@ -298,6 +342,10 @@ API キーごとに「処理中・処理待ちの入力トークン数の合計�
 ### 429 Too Many Requests（Batch pending token limit exceeded）
 
 処理中・処理待ちの入力トークン合計が、API キーに設定された上限を超えている。バッチ作成（`POST /v1/batches`）時に「現在の使用量 ＋ 新規バッチのトークン数」が上限を超えると返る。対処: 既存バッチの完了を待つ、入力のトークン数を減らす、または管理者に上限の確認・引き上げを依頼する。詳細は「処理中トークン上限」を参照。
+
+### 429 Too Many Requests（Batch short-window / long-window token limit exceeded）
+
+直近一定期間（既定: 短期 3 時間 / 長期 7 日）のバッチ推論使用トークン合計が、API キーに設定された上限を超えている。対処: 短期ウィンドウは時間経過で古い使用量が外れるため数時間待つ、`GET /v1/usage` で残量を確認してから投入する、または管理者に上限引き上げを依頼する。詳細は「バッチ用ウィンドウ上限」を参照。
 
 ### 503 Service Unavailable
 
@@ -326,6 +374,8 @@ API キーごとに「処理中・処理待ちの入力トークン数の合計�
 
 ## 参考リンク
 
+- [usage_api_document.md](usage_api_document.md) - 使用量確認 API（`GET /v1/usage`）
+- [chat_completions_api_document.md](chat_completions_api_document.md) - Chat Completions API
 - [BATCH_API.md](BATCH_API.md) - 開発者向け技術仕様
 - [OpenAI Batch API 公式ドキュメント](https://platform.openai.com/docs/api-reference/batch)
 - [scripts/test_batch_api.py](../scripts/test_batch_api.py) - 動作確認用テストスクリプト
