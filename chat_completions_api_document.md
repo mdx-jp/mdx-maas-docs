@@ -328,25 +328,35 @@ APIは以下のHTTPステータスコードを返す可能性があります:
 
 ### 429 Too Many Requests
 
-- **原因**: 1時間あたりのトークン制限を超えた、または同時リクエスト数が上限を超えた
-- **レスポンス例**:
-    
+- **原因**: 短期ウィンドウまたは長期ウィンドウのトークン上限を超えた、もしくは同時リクエスト数が上限を超えた
+- **レスポンス例（短期ウィンドウ超過）**:
+
     ```json
     {
-      "detail": "Hourly token limit exceeded. Current usage: 100000, Limit: 50000"
+      "detail": "Chat short-window (3h) token limit exceeded. Current: 105000, Limit: 100000"
     }
     ```
-    
-    または
-    
+
+- **レスポンス例（長期ウィンドウ超過）**:
+
+    ```json
+    {
+      "detail": "Chat long-window (7d) token limit exceeded. Current: 1050000, Limit: 1000000"
+    }
+    ```
+
+- **レスポンス例（同時リクエスト数超過）**:
+
     ```json
     {
       "detail": "Too many concurrent requests. Please try again later."
     }
     ```
-    
+
 - **対処法**:
-    - しばらく待ってから再試行
+    - しばらく待ってから再試行する（短期ウィンドウは時間が経つほど古い使用量がウィンドウから外れる）
+    - 投入前に `GET /v1/usage` で現在の使用量・残量を確認する。詳細は [usage_api_document.md](usage_api_document.md) を参照
+    - 上限の引き上げが必要な場合は管理者に依頼する
 
 ### 500 Internal Server Error
 
@@ -406,7 +416,7 @@ except Exception as e:
 ## 制限事項
 
 - **タイムアウト**: リクエストのタイムアウトは1800秒（30分）
-- **トークン制限**: APIキーごとに1時間あたりのトークン制限が設定されている場合があります
+- **トークン制限（ウィンドウ上限）**: API キーごとに「短期ウィンドウ（直近 N 時間、既定 3 時間）」「長期ウィンドウ（直近 N 日、既定 7 日）」のスライディング合計トークン上限が設定されている場合があります。超過時は **429 Too Many Requests** が返り、レスポンスの `detail` に `"Chat short-window"` または `"Chat long-window"` を含みます。バッチ推論側の上限とは別管理です。現在の使用量・残量は `GET /v1/usage` で確認できます（[usage_api_document.md](usage_api_document.md)）。
 
 ## ベストプラクティス
 
