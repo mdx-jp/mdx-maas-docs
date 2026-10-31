@@ -23,7 +23,7 @@
 ## 前提条件
 
 - **API キー**: 管理者から発行された API キーを取得していること
-- **利用可能モデル**: バッチ推論で利用可能なモデル一覧は管理者に確認すること（通常の Chat Completions 用モデルとは別設定の可能性がある）。現在提供しているモデルの一覧として、**openai/gpt-oss-20b** が提供されている。
+- **利用可能モデル**: バッチ推論で利用できるモデルは [利用可能モデル一覧](https://docs.google.com/spreadsheets/d/18eMqI3kPDjVVBLRdyHSuinkJ-6ZVQ-Uh-8BWXHNBO0g/edit?gid=0#gid=0) の「Batch API」の列を確認すること（Chat Completions で利用できるモデルとは異なる場合がある）。
 - **ベース URL**: プロキシのベース URL（`https://api.maas.mdx1.jp/v1`）を確認すること
 
 ---
@@ -66,6 +66,8 @@ flowchart LR
 | 2. バッチ作成 | `file_id` を指定してバッチジョブを作成し、`batch_id` を取得する |
 | 3. 状態確認 | `batch_id` でステータスをポーリングし、`completed` になるまで待つ |
 | 4. 結果取得 | `output_file_id` と `error_file_id` から結果をダウンロードする |
+
+**注意**: アクセスがないときはモデルと計算ノードを停止しているため、しばらく利用がなかったモデルでは、処理の開始までに **15〜20 分程度** かかることがある。その間、ステータスは `in_progress` のまま進まないように見える。ファイルのアップロードやステータスの確認はモデルの起動を待たないので、クライアント側のタイムアウトを変更する必要はない。
 
 ---
 
@@ -376,6 +378,4 @@ API キーごとに「処理中・処理待ちの入力トークン数の合計�
 
 - [usage_api_document.md](usage_api_document.md) - 使用量確認 API（`GET /v1/usage`）
 - [chat_completions_api_document.md](chat_completions_api_document.md) - Chat Completions API
-- [BATCH_API.md](BATCH_API.md) - 開発者向け技術仕様
 - [OpenAI Batch API 公式ドキュメント](https://platform.openai.com/docs/api-reference/batch)
-- [scripts/test_batch_api.py](../scripts/test_batch_api.py) - 動作確認用テストスクリプト

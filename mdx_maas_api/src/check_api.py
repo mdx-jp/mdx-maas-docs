@@ -6,11 +6,12 @@ from settings import MAAS_API_BASE_URL, MAAS_API_KEY
 client = OpenAI(
     base_url=MAAS_API_BASE_URL,
     api_key=MAAS_API_KEY,
+    timeout=1800,  # モデルの起動を待つことがあるため 30 分にする
 )
 
 # APIを呼び出す
 completion = client.chat.completions.create(
-    model="llm-jp/llm-jp-4-32b-a3b-thinking",
+    model="llm-jp/llm-jp-4.1-33b-thinking",
     messages=[{"role": "user", "content": "こんにちは！"}],
 )
 
