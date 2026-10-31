@@ -20,12 +20,26 @@ Authorization: Bearer <your-api-key>
 
 APIキーは管理者から提供されます。APIキーが無効または期限切れの場合、`401 Unauthorized`エラーが返されます。
 
+## 最初のリクエストの待ち時間
+
+計算資源を有効に使うため、アクセスがないときはモデルと計算ノードを停止しています。しばらく利用がなかったモデルへの最初のリクエストは起動を待つことになり、応答までに **15〜20 分程度** かかることがあります。起動後は通常の応答速度で利用できます。ストリーミングでも、起動が終わるまで最初のデータは届きません。
+
+**クライアント側のタイムアウトは 30 分程度（1800 秒）に設定することを推奨します。** 既定のタイムアウトが短いクライアントでは、起動を待っている間に接続が切れることがあります。
+
+| クライアント | 既定のタイムアウト | 設定方法 |
+|---|---|---|
+| OpenAI Python SDK | 10 分 | `OpenAI(timeout=1800)` |
+| curl | なし | `--max-time 1800` |
+
+本ドキュメントの使用例には、この設定を入れています。
+
 ## リクエストパラメータ
 
 ### 必須パラメータ
 
 - **model** (string): 使用するLLMモデルの名前
-    - 例: `"openai/gpt-oss-20b"`, `"llm-jp/llm-jp-3.1-13b-instruct4"`
+    - 例: `"llm-jp/llm-jp-4.1-33b-thinking"`, `"openai/gpt-oss-20b"`
+    - 利用できるモデルは [利用可能モデル一覧](https://docs.google.com/spreadsheets/d/18eMqI3kPDjVVBLRdyHSuinkJ-6ZVQ-Uh-8BWXHNBO0g/edit?gid=0#gid=0) を参照してください
 - **messages** (array): チャットメッセージの配列
     - 各メッセージは以下の形式:
         
@@ -112,6 +126,7 @@ from openai import OpenAI
 client = OpenAI(
     base_url="https://api.maas.mdx1.jp/v1",
     api_key="your-api-key-here",
+    timeout=1800,  # 30 分
 )
 
 completion = client.chat.completions.create(
@@ -150,6 +165,7 @@ if completion.usage:
 
 ```bash
 curl -X POST "https://api.maas.mdx1.jp/v1/chat/completions" \
+  --max-time 1800 \
   -H "Authorization: Bearer your-api-key-here" \
   -H "Content-Type: application/json" \
   -d '{
@@ -200,6 +216,7 @@ from openai import OpenAI
 client = OpenAI(
     base_url="https://api.maas.mdx1.jp/v1",
     api_key="your-api-key-here",
+    timeout=1800,  # 30 分
 )
 
 completion = client.chat.completions.create(
@@ -235,10 +252,11 @@ from openai import OpenAI
 client = OpenAI(
     base_url="https://api.maas.mdx1.jp/v1",
     api_key="your-api-key-here",
+    timeout=1800,  # 30 分
 )
 
 completion = client.chat.completions.create(
-    model="llm-jp/llm-jp-3.1-13b-instruct4",
+    model="llm-jp/llm-jp-4.1-33b-thinking",
     messages=[
         {
             "role": "system",
@@ -274,6 +292,7 @@ from openai import OpenAI
 client = OpenAI(
     base_url="https://api.maas.mdx1.jp/v1",
     api_key="your-api-key-here",
+    timeout=1800,  # 30 分
 )
 
 completion = client.chat.completions.create(
@@ -376,11 +395,12 @@ APIは以下のHTTPステータスコードを返す可能性があります:
 ### エラーハンドリングの実装例
 
 ```python
-from openai import OpenAI, APIError, APIConnectionError, APITimeoutError
+from openai import OpenAI, APIConnectionError, APIStatusError, APITimeoutError
 
 client = OpenAI(
     base_url="https://api.maas.mdx1.jp/v1",
     api_key="your-api-key-here",
+    timeout=1800,  # 30 分
 )
 
 try:
@@ -393,7 +413,13 @@ try:
     )
     print(completion.choices[0].message.content)
 
-except APIError as e:
+except APITimeoutError:
+    print("タイムアウトエラー: リクエストがタイムアウトしました")
+
+except APIConnectionError as e:
+    print(f"接続エラー:{e}")
+
+except APIStatusError as e:
     if e.status_code == 401:
         print("認証エラー: APIキーを確認してください")
     elif e.status_code == 429:
@@ -403,24 +429,18 @@ except APIError as e:
     else:
         print(f"APIエラー{e.status_code}:{e.message}")
 
-except APIConnectionError as e:
-    print(f"接続エラー:{e}")
-
-except APITimeoutError as e:
-    print("タイムアウトエラー: リクエストがタイムアウトしました")
-
 except Exception as e:
     print(f"予期しないエラー:{e}")
 ```
 
 ## 制限事項
 
-- **タイムアウト**: リクエストのタイムアウトは1800秒（30分）
+- **タイムアウト**: サーバー側のリクエストのタイムアウトは1800秒（30分）
 - **トークン制限（ウィンドウ上限）**: API キーごとに「短期ウィンドウ（直近 N 時間、既定 3 時間）」「長期ウィンドウ（直近 N 日、既定 7 日）」のスライディング合計トークン上限が設定されている場合があります。超過時は **429 Too Many Requests** が返り、レスポンスの `detail` に `"Chat short-window"` または `"Chat long-window"` を含みます。バッチ推論側の上限とは別管理です。現在の使用量・残量は `GET /v1/usage` で確認できます（[usage_api_document.md](usage_api_document.md)）。
 
 ## ベストプラクティス
 
 1. **エラーハンドリング**: すべてのAPI呼び出しで適切なエラーハンドリングを実装してください
-2. **タイムアウト設定**: 長時間実行される可能性があるため、適切なタイムアウトを設定してください
+2. **タイムアウト設定**: モデルの起動を待つことがあるため、クライアント側のタイムアウトは30分程度（1800秒）に設定してください（[最初のリクエストの待ち時間](#最初のリクエストの待ち時間)）
 3. **ストリーミングの使用**: 長いレスポンスが期待される場合は、ストリーミングモードを使用してユーザー体験を向上させてください
 4. **リトライロジック**: 429エラーや一時的なエラーに対しては、指数バックオフを使用したリトライロジックを実装することを推奨します
