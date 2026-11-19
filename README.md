@@ -4,6 +4,9 @@
 
 **🌐 ユーザーポータル（利用申請・利用可能モデル・FAQ）: [https://maas.mdx1.jp/](https://maas.mdx1.jp/)**
 
+> [!IMPORTANT]
+> API ドキュメントは、2026年11月19日に [ユーザーポータル](https://maas.mdx1.jp/) に移動しました。最新の内容は、下の「ドキュメント」の各ページをご覧ください。
+
 ## mdx-MaaS とは
 
 mdx-MaaS は、データ活用社会創成プラットフォーム [mdx](https://mdx.jp/mdx1/) 上で運用している、学術機関が生成 AI モデル（LLM）を安全かつ効率的に活用するための推論基盤です。
@@ -16,9 +19,10 @@ mdx-MaaS は、データ活用社会創成プラットフォーム [mdx](https:/
 
 | ドキュメント | 内容 |
 | --- | --- |
-| [即時応答 API（Chat Completions）](chat_completions_api_document.md) | リクエストに対して推論結果をリアルタイムに返す API。対話的な用途やリアルタイム処理向け |
-| [Batch API](batch_inference_api_document.md) | 複数のリクエストをファイルでまとめて投入し、非同期に処理する API。大量テキストの分類・翻訳・要約向け |
-| [Usage API](usage_api_document.md) | 利用状況を確認する API |
+| [即時応答 API（Chat Completions）](https://maas.mdx1.jp/docs/chat-completions.html) | リクエストに対して推論結果をリアルタイムに返す API。対話的な用途やリアルタイム処理向け |
+| [Batch API](https://maas.mdx1.jp/docs/batch.html) | 複数のリクエストをファイルでまとめて投入し、非同期に処理する API。大量テキストの分類・翻訳・要約向け |
+| [Usage API](https://maas.mdx1.jp/docs/usage.html) | 利用状況を確認する API |
+| [利用可能なモデル一覧](https://maas.mdx1.jp/models.html) | API で利用できるモデルと、対応している API |
 
 ## クイックスタート
 
@@ -39,7 +43,7 @@ client = OpenAI(
 > [!NOTE]
 > 計算資源を有効に使うため、アクセスがないときはモデルを停止しています。しばらく利用がなかったモデルへの最初のリクエストは、応答までに 15〜20 分程度かかることがあります。クライアント側のタイムアウトは 30 分程度に設定してください。
 
-利用できるモデルは、[ユーザーポータル](https://maas.mdx1.jp/) の「現在利用可能なモデル」を参照してください。
+利用できるモデルは、ユーザーポータルの [利用可能なモデル一覧](https://maas.mdx1.jp/models.html) を参照してください。
 
 ## 関連リンク
 
